@@ -82,11 +82,7 @@ require(["vs/editor/editor.main"], function () {
     const lineContent = model.getLineContent(position.lineNumber);
     const trimmed = lineContent.trim().toLowerCase();
 
-    const isHybrid =
-      trimmed === "else" ||
-      trimmed.startsWith("else ") ||
-      trimmed === "elif" ||
-      trimmed.startsWith("else if");
+    const isHybrid = checkIsHybrid(trimmed);
     const isExplicitEnder =
       CONFIG.enders.some((ender) => {
         const pattern = new RegExp(`^${ender.replace(/\s+/g, "\\s+")}$`, "i");
@@ -101,6 +97,7 @@ require(["vs/editor/editor.main"], function () {
       let blockedIndents = new Set();
 
       // Scan upwards to map the code tree grid
+      // Scan upwards to map the code tree grid
       for (let i = position.lineNumber - 1; i >= 1; i--) {
         const checkLine = model.getLineContent(i);
         const checkTrimmed = checkLine.trim().toLowerCase();
@@ -109,11 +106,15 @@ require(["vs/editor/editor.main"], function () {
 
         const checkIndent = checkLine.match(/^\s*/)[0].length;
 
+        // Determine exactly what type of line we are looking at dynamically
+        const isCheckHybrid = checkIsHybrid(checkTrimmed);
+
+        // A true starter cannot be a hybrid element
         const isStarter =
           CONFIG.starters.some((s) => checkTrimmed.startsWith(s)) &&
-          !checkTrimmed.startsWith("else") &&
-          !checkTrimmed.startsWith("elif");
+          !isCheckHybrid;
 
+        // A true ender cannot be a hybrid element
         const isEnder =
           CONFIG.enders.some((ender) => {
             const pattern = new RegExp(
@@ -121,14 +122,7 @@ require(["vs/editor/editor.main"], function () {
               "i",
             );
             return pattern.test(checkTrimmed);
-          }) &&
-          !checkTrimmed.startsWith("else") &&
-          !checkTrimmed.startsWith("elif");
-
-        const isCheckHybrid =
-          checkTrimmed === "else" ||
-          checkTrimmed.startsWith("else ") ||
-          checkTrimmed === "elif";
+          }) && !isCheckHybrid;
 
         // 1. If we see an existing explicit closer or middle hybrid block,
         // that exact indentation layer is blocked from taking new connections.
@@ -138,11 +132,9 @@ require(["vs/editor/editor.main"], function () {
 
         // 2. If we find an opening block statement ('if', 'while', etc.)
         if (isStarter) {
-          // If this layer was blocked by an 'end if' or 'else' below it, clear the block and keep climbing
           if (blockedIndents.has(checkIndent)) {
             blockedIndents.delete(checkIndent);
           } else {
-            // Found a live, unblocked open structural parent!
             targetIndent = checkIndent;
             break;
           }
