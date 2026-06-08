@@ -1,10 +1,8 @@
 // config.js
-
-const blocksStartEnd = ["else", "else if", "elif"];
-
 const CONFIG = {
   tabSize: 4,
-  starters: ["if", "while", "function", "func", "fun", ...blocksStartEnd],
+  hybrids: ["else", "else if", "elif"],
+  starters: ["if", "while", "function", "func", "fun"],
   closers: ["then", "do", ":"],
   enders: [
     "endif",
@@ -16,7 +14,6 @@ const CONFIG = {
     "endfun",
     "end function",
     "end",
-    ...blocksStartEnd,
   ],
   commands: ["return", "break", "continue"],
 };

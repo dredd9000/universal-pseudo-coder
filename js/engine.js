@@ -1,5 +1,6 @@
-// engine.js
+// js/engine.js
 
+// Ensure your config.js and helpers are loaded/available before running this
 require.config({
   paths: {
     vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs",
@@ -9,20 +10,47 @@ require.config({
 require(["vs/editor/editor.main"], function () {
   monaco.languages.register({ id: "pseudocode" });
 
-  // Dynamic Monarch Tokenizer for Syntax Highlighting
+  // --- HELPER FUNCTIONS (INCLUDED DIRECTLY FOR SELF-CONTAINED EXECUTION) ---
+
+  function checkIsHybrid(val) {
+    return CONFIG.hybrids.some(
+      (item) => val === item || val.startsWith(item + " "),
+    );
+  }
+
+  function checkIsStarter(val) {
+    return CONFIG.starters.some((s) => {
+      const pattern = new RegExp(`^${s}(?:\\b|$)`, "i");
+      return pattern.test(val);
+    });
+  }
+
+  function checkIsEnder(val) {
+    return CONFIG.enders.some((ender) => {
+      const pattern = new RegExp(`^${ender.replace(/\s+/g, "\\s+")}$`, "i");
+      return pattern.test(val);
+    });
+  }
+
+  // --- MONACO SYNTAX HIGHLIGHTING (MONARCH) ---
+
   monaco.languages.setMonarchTokensProvider("pseudocode", {
     keywords: [
       ...CONFIG.starters,
       ...CONFIG.closers,
       ...CONFIG.enders,
       ...CONFIG.commands,
+      ...CONFIG.hybrids,
     ],
     ignoreCase: true,
     tokenizer: {
       root: [
         [
           new RegExp(
-            `\\b(?:${CONFIG.enders.map((e) => e.trim().replace(/\s+/g, "\\s+")).join("|")})\\b`,
+            `\\b(?:${CONFIG.enders
+              .concat(CONFIG.hybrids)
+              .map((e) => e.trim().replace(/\s+/g, "\\s+"))
+              .join("|")})\\b`,
             "i",
           ),
           "keyword",
@@ -39,7 +67,6 @@ require(["vs/editor/editor.main"], function () {
     },
   });
 
-  // Keep manual control over the indentation layout rules
   monaco.languages.setLanguageConfiguration("pseudocode", {
     autoIndent: "none",
     brackets: [
@@ -54,6 +81,8 @@ require(["vs/editor/editor.main"], function () {
       { open: '"', close: '"' },
     ],
   });
+
+  // --- EDITOR INITIALIZATION ---
 
   var editor = monaco.editor.create(document.getElementById("editor"), {
     value: [
@@ -75,7 +104,7 @@ require(["vs/editor/editor.main"], function () {
   });
 
   // ========================================================
-  // UNIFIED SCOPE ENGINE: HANDLES BOTH KEYWORDS & PYTHON-STYLE
+  // PATH-SPLIT SCOPE ENGINE: ALIGNS KEYWORDS ON KEY-UP
   // ========================================================
 
   editor.onKeyUp(function (e) {
@@ -85,130 +114,136 @@ require(["vs/editor/editor.main"], function () {
     const trimmed = lineContent.trim().toLowerCase();
 
     const isHybrid = checkIsHybrid(trimmed);
-    const isExplicitEnder =
-      CONFIG.enders.some((ender) => {
-        const pattern = new RegExp(`^${ender.replace(/\s+/g, "\\s+")}$`, "i");
-        return pattern.test(trimmed);
-      }) && !isHybrid;
+    const isExplicitEnder = checkIsEnder(trimmed);
 
-    if (isHybrid || isExplicitEnder) {
-      const currentIndent = lineContent.match(/^\s*/)[0].length;
-      let targetIndent = -1;
+    if (!isHybrid && !isExplicitEnder) return;
 
-      // Track structures that are already "claimed" by blockers at specific indentations
-      let blockedIndents = new Set();
+    const currentIndent = lineContent.match(/^\s*/)[0].length;
+    let targetIndent = -1;
 
-      // Scan upwards to map the code tree grid
-      // Scan upwards to map the code tree grid
+    // --------------------------------------------------------
+    // PATHWAY A: USER TYPED AN EXPLICIT ENDER (e.g., "end", "end if")
+    // --------------------------------------------------------
+    if (isExplicitEnder) {
+      let openBlocksNeeded = 1;
+
       for (let i = position.lineNumber - 1; i >= 1; i--) {
-        const checkLine = model.getLineContent(i);
-        const checkTrimmed = checkLine.trim().toLowerCase();
-
+        const checkTrimmed = model.getLineContent(i).trim().toLowerCase();
         if (checkTrimmed === "") continue;
 
-        const checkIndent = checkLine.match(/^\s*/)[0].length;
+        const checkIndent = model.getLineContent(i).match(/^\s*/)[0].length;
 
-        // Determine exactly what type of line we are looking at dynamically
-        const isCheckHybrid = checkIsHybrid(checkTrimmed);
+        if (checkIsEnder(checkTrimmed)) {
+          openBlocksNeeded++;
+        } else if (
+          checkIsStarter(checkTrimmed) ||
+          checkIsHybrid(checkTrimmed)
+        ) {
+          openBlocksNeeded--;
+          if (openBlocksNeeded === 0) {
+            targetIndent = checkIndent;
+            break;
+          }
+        }
+      }
+    }
+    // --------------------------------------------------------
+    // PATHWAY B: USER TYPED A HYBRID INTERMEDIATE (e.g., "else", "elif")
+    // --------------------------------------------------------
+    else if (isHybrid) {
+      let blockCounts = {};
 
-        // A true starter cannot be a hybrid element
-        const isStarter =
-          CONFIG.starters.some((s) => checkTrimmed.startsWith(s)) &&
-          !isCheckHybrid;
+      for (let i = position.lineNumber - 1; i >= 1; i--) {
+        const checkTrimmed = model.getLineContent(i).trim().toLowerCase();
+        if (checkTrimmed === "") continue;
 
-        // A true ender cannot be a hybrid element
-        const isEnder =
-          CONFIG.enders.some((ender) => {
-            const pattern = new RegExp(
-              `^${ender.replace(/\s+/g, "\\s+")}$`,
-              "i",
-            );
-            return pattern.test(checkTrimmed);
-          }) && !isCheckHybrid;
+        const checkIndent = model.getLineContent(i).match(/^\s*/)[0].length;
 
-        // 1. If we see an existing explicit closer or middle hybrid block,
-        // that exact indentation layer is blocked from taking new connections.
-        if (isEnder || isCheckHybrid) {
-          blockedIndents.add(checkIndent);
+        if (checkIsEnder(checkTrimmed) || checkIsHybrid(checkTrimmed)) {
+          blockCounts[checkIndent] = (blockCounts[checkIndent] || 0) + 1;
         }
 
-        // 2. If we find an opening block statement ('if', 'while', etc.)
-        if (isStarter) {
-          if (blockedIndents.has(checkIndent)) {
-            blockedIndents.delete(checkIndent);
+        if (checkIsStarter(checkTrimmed)) {
+          if (blockCounts[checkIndent] && blockCounts[checkIndent] > 0) {
+            blockCounts[checkIndent]--;
           } else {
             targetIndent = checkIndent;
             break;
           }
         }
       }
+    }
 
-      // If we found a valid parent tier, match its grid layout
-      if (targetIndent !== -1 && currentIndent !== targetIndent) {
-        const spaces = " ".repeat(targetIndent);
-        const newText = spaces + lineContent.trim();
+    // Apply indentation modification rules smoothly if layout mismatch detected
+    if (targetIndent !== -1 && currentIndent !== targetIndent) {
+      const spaces = " ".repeat(targetIndent);
+      const newText = spaces + lineContent.trim();
 
-        model.pushEditOperations(
-          [],
-          [
-            {
-              range: new monaco.Range(
-                position.lineNumber,
-                1,
-                position.lineNumber,
-                lineContent.length + 1,
-              ),
-              text: newText,
-            },
-          ],
-          () => null,
-        );
+      model.pushEditOperations(
+        [],
+        [
+          {
+            range: new monaco.Range(
+              position.lineNumber,
+              1,
+              position.lineNumber,
+              lineContent.length + 1,
+            ),
+            text: newText,
+          },
+        ],
+        () => null,
+      );
 
-        editor.setPosition({
-          lineNumber: position.lineNumber,
-          column: newText.length + 1,
-        });
-      }
+      editor.setPosition({
+        lineNumber: position.lineNumber,
+        column: newText.length + 1,
+      });
     }
   });
 
-  // Listen for Enter key to push indentation calculations seamlessly
+  // ========================================================
+  // INDENTATION ENGINE: ADDS SPACES ON ENTER KEY-DOWN
+  // ========================================================
+
   editor.onKeyDown(function (e) {
-    if (e.keyCode === monaco.KeyCode.Enter) {
-      const model = editor.getModel();
-      const position = editor.getPosition();
-      const lineContent = model.getLineContent(position.lineNumber);
-      const trimmed = lineContent.trim().toLowerCase();
+    if (e.keyCode !== monaco.KeyCode.Enter) return;
 
-      let currentLineIndent = lineContent.match(/^\s*/)[0].length;
-      let nextIndent = currentLineIndent;
+    const model = editor.getModel();
+    const position = editor.getPosition();
+    const lineContent = model.getLineContent(position.lineNumber);
+    const trimmed = lineContent.trim().toLowerCase();
 
-      const isStarter =
-        CONFIG.starters.some((s) => trimmed.startsWith(s)) ||
-        CONFIG.closers.some((c) => c !== "" && trimmed.endsWith(c)) ||
-        trimmed.endsWith(":");
+    let currentLineIndent = lineContent.match(/^\s*/)[0].length;
+    let nextIndent = currentLineIndent;
 
-      if (isStarter) {
-        nextIndent += CONFIG.tabSize;
-      }
+    // Line blocks forward if it has an opener statement or syntax closure punctuation
+    const isBlockOpener =
+      checkIsStarter(trimmed) ||
+      checkIsHybrid(trimmed) ||
+      CONFIG.closers.some((c) => c !== "" && trimmed.endsWith(c)) ||
+      trimmed.endsWith(":");
 
-      const spaces = "\n" + " ".repeat(nextIndent);
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      editor.executeEdits("smart-enter", [
-        {
-          range: new monaco.Range(
-            position.lineNumber,
-            position.column,
-            position.lineNumber,
-            position.column,
-          ),
-          text: spaces,
-          forceMoveMarkers: true,
-        },
-      ]);
+    if (isBlockOpener) {
+      nextIndent += CONFIG.tabSize;
     }
+
+    const spaces = "\n" + " ".repeat(nextIndent);
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    editor.executeEdits("smart-enter", [
+      {
+        range: new monaco.Range(
+          position.lineNumber,
+          position.column,
+          position.lineNumber,
+          position.column,
+        ),
+        text: spaces,
+        forceMoveMarkers: true,
+      },
+    ]);
   });
 });
