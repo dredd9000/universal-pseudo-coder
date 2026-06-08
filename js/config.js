@@ -1,6 +1,6 @@
 const CONFIG = {
   tabSize: 4,
-  starters: ["if", "while", "function"],
+  starters: ["if", "while", "function", "func", "fun"],
   closers: ["then", "do", ":"],
   enders: [
     "endif",
@@ -8,7 +8,11 @@ const CONFIG = {
     "endwhile",
     "end while",
     "endfunction",
+    "endfunc",
+    "endfun",
     "end function",
+    "end",
     "else",
   ],
+  commands: ["return", "break", "continue"],
 };

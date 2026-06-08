@@ -12,8 +12,7 @@ require(["vs/editor/editor.main"], function () {
       ...CONFIG.starters,
       ...CONFIG.closers,
       ...CONFIG.enders,
-      "return",
-      "break",
+      ...CONFIG.commands,
     ],
     ignoreCase: true,
     tokenizer: {
