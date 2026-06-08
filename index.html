@@ -3,25 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <title>Reliable Custom Pseudocode IDE</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
-        background-color: #1e1e1e;
-        color: #fff;
-      }
-      #editor {
-        width: 100%;
-        height: 500px;
-        border: 1px solid #444;
-      }
-    </style>
+    <link rel="stylesheet" href="css/index.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
   </head>
   <body>
-    <h2>Reliable Custom Pseudocode IDE</h2>
+    <!-- index.html -->
+    <div class="title-container">
+      <!-- Contenteditable allows native typing behavior directly inside the H2 tag -->
+      <h2 id="editable-title" contenteditable="true" spellcheck="false">
+        My Pseudocode Project
+      </h2>
+      <span class="edit-icon">✏️</span>
+    </div>
     <div id="editor"></div>
 
+    <script src="js/title.js"></script>
     <script src="js/config.js"></script>
     <script src="js/helpers.js"></script>
     <script src="js/engine.js"></script>
