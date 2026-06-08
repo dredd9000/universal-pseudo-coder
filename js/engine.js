@@ -82,6 +82,26 @@ require(["vs/editor/editor.main"], function () {
     ],
   });
 
+  // Example B: VS Code "Dracula" Color Palette
+  monaco.editor.defineTheme("dracula", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "keyword", foreground: "FF79C6", fontStyle: "bold" }, // Pink
+      { token: "identifier", foreground: "F8F8F2" }, // White
+      { token: "string", foreground: "F1FA8C" }, // Yellow
+      { token: "number", foreground: "BD93F9" }, // Purple
+      { token: "comment", foreground: "6272A4", fontStyle: "italic" }, // Comment Blue
+      { token: "delimiter", foreground: "8BE9FD" }, // Cyan
+    ],
+    colors: {
+      "editor.background": "#282A36",
+      "editor.foreground": "#F8F8F2",
+      "editorCursor.foreground": "#F8F8F0",
+      "editor.lineHighlightBackground": "#44475A",
+    },
+  });
+
   // --- EDITOR INITIALIZATION ---
 
   var editor = monaco.editor.create(document.getElementById("editor"), {
@@ -97,7 +117,7 @@ require(["vs/editor/editor.main"], function () {
       "end if",
     ].join("\n"),
     language: "pseudocode",
-    theme: "vs-dark",
+    theme: "dracula",
     automaticLayout: true,
     tabSize: CONFIG.tabSize,
     insertSpaces: true,
