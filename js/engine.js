@@ -106,6 +106,7 @@ require(["vs/editor/editor.main"], function () {
     }
   });
 
+  // Listen for Enter key to calculate correct next-line spacing perfectly
   editor.onKeyDown(function (e) {
     if (e.keyCode === monaco.KeyCode.Enter) {
       const model = editor.getModel();
@@ -113,19 +114,26 @@ require(["vs/editor/editor.main"], function () {
       const lineContent = model.getLineContent(position.lineNumber);
       const trimmed = lineContent.trim().toLowerCase();
 
+      // Calculate current line's base indentation space count
+      let currentLineIndent = lineContent.match(/^\s*/)[0].length;
+      let nextIndent = currentLineIndent;
+
+      // Check if this line opens a new block zone
       const isStarter =
         CONFIG.starters.some((s) => trimmed.startsWith(s)) ||
         CONFIG.closers.some((c) => c !== "" && trimmed.endsWith(c)) ||
         trimmed.endsWith(":");
 
-      // If we press Enter on a starter, indent the next line
-      let nextIndent = lineContent.match(/^\s*/)[0].length;
-      if (isStarter) nextIndent += CONFIG.tabSize;
+      if (isStarter) {
+        nextIndent += CONFIG.tabSize; // Push the NEXT line in (+4 spaces)
+      }
 
       const spaces = "\n" + " ".repeat(nextIndent);
-      e.preventDefault();
+
+      e.preventDefault(); // Stop Monaco's default bad enter spacing
       e.stopPropagation();
 
+      // Insert our clean calculated line break manually
       editor.executeEdits("smart-enter", [
         {
           range: new monaco.Range(
