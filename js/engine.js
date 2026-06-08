@@ -19,8 +19,15 @@ require(["vs/editor/editor.main"], function () {
     ignoreCase: true,
     tokenizer: {
       root: [
+        // [
+        //   /\bend\s+if\b|\bendif\b|\bend\s+while\b|\bendwhile\b|\bend\s+function\b|\bendfunction\b/i,
+        //   "keyword",
+        // ],
         [
-          /\bend\s+if\b|\bendif\b|\bend\s+while\b|\bendwhile\b|\bend\s+function\b|\bendfunction\b/i,
+          new RegExp(
+            `\\b(?:${CONFIG.enders.map((e) => e.trim().replace(/\s+/g, "\\s+")).join("|")})\\b`,
+            "i",
+          ),
           "keyword",
         ],
         [
