@@ -1,3 +1,5 @@
+// config.js
+
 const blocksStartEnd = ["else", "else if", "elif"];
 
 const CONFIG = {
